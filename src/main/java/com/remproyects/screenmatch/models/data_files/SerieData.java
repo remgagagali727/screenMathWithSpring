@@ -8,6 +8,14 @@ public record SerieData(
 
         @JsonProperty("Title") String title,
 
+        @JsonProperty("Genre") String genre,
+
+        @JsonProperty("Plot") String plot,
+
+        @JsonProperty("Poster") String poster,
+
+        @JsonProperty("Actors") String actors,
+
         Integer totalSeasons,
 
         @JsonProperty("imdbRating") Double rating

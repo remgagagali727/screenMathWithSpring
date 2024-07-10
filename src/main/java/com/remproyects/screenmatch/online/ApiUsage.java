@@ -8,8 +8,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 public class ApiUsage {
-    public String getData(String url) throws URISyntaxException {
-        return getData(new URI(url));
+    public String getData(String url) {
+        try {
+            return getData(new URI(url));
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public String getData(URI url) {

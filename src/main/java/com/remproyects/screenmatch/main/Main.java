@@ -1,117 +1,177 @@
 package com.remproyects.screenmatch.main;
 
 import com.remproyects.screenmatch.data.JsonTransformer;
-import com.remproyects.screenmatch.models.data_files.EpisodeData;
 import com.remproyects.screenmatch.models.data_files.SeasonData;
 import com.remproyects.screenmatch.models.data_files.SerieData;
+import com.remproyects.screenmatch.models.defined.Category;
 import com.remproyects.screenmatch.models.files.Episode;
+import com.remproyects.screenmatch.models.files.Serie;
 import com.remproyects.screenmatch.online.ApiUsage;
 import com.remproyects.screenmatch.online.util.Keys;
+import com.remproyects.screenmatch.repository.SerieRepository;
 
-import java.net.URISyntaxException;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class Main {
 
     private final Scanner scanner = new Scanner(System.in);
+    private final ApiUsage apiUsage = new ApiUsage();
+    private List<Serie> series;
+    private SerieRepository serieRepository;
 
-    public Main() throws URISyntaxException {
-        ApiUsage apiUsage = new ApiUsage();
+    public Main(SerieRepository serieRepository) {
+        this.serieRepository = serieRepository;
+        core();
+    }
 
-        String name = showMenu("Escribe el nombre de la serie que deaseas buscar").replace(' ', '+');
+    private void core() {
 
-        String json = apiUsage.getData(
-                "https://www.omdbapi.com/?apikey=" + Keys.ombdKey + "&t=" + name
-        );
+        char option = 0;
 
-        SerieData series = new JsonTransformer().fromJson(json, SerieData.class);
+        while (option != '0') {
+            option = showMenu("""
+                    Elije una opcion
+                    1. Buscar serie
+                    2. Buscar episodio
+                    3. Mostrar todas las series
+                    4. Buscar series por titulo
+                    5. ¡Top 5 series!
+                    6. Buscar por categoria
+                    7. Buscar con maximo temporadas y minima evaluacion
+                    
+                    0. Salir
+                    """).toLowerCase().charAt(0);
 
-        List<SeasonData> seasons = new ArrayList<>();
+            switch (option) {
+                case '0':
+                    break;
+                case '1':
+                    serie();
+                    break;
+                case '2':
+                    episode();
+                    break;
+                case '3':
+                    showSeries();
+                    break;
+                case '4':
+                    searchSerieByTitle();
+                    break;
+                case '5':
+                    topFiveSeries();
+                    break;
+                case '6':
+                    searchSerieByGenre();
+                    break;
+                case '7':
+                    searchBySeasonsAndRating();
+                    break;
+                default:
+                    System.out.println("Invalid option");
+            }
+        }
+    }
 
-        System.out.println("Total seasons = " + series.totalSeasons());
+    private void searchBySeasonsAndRating() {
+        String qry = showMenu("""
+                Dame las maximas temporadas y la calificacion minima
+                Formato -> [(temporadas) (calificacion)]
+                """);
+        Integer seasons;
+        Double rating;
 
-        for(int i = 0;i < series.totalSeasons();i++) {
-            String serieJson = apiUsage.getData(
-                    "https://www.omdbapi.com/?apikey=" + Keys.ombdKey + "&t="
-                            + name
-                            + "&season=" + (i + 1)
-            );
-            SeasonData sData = new JsonTransformer().fromJson(serieJson, SeasonData.class);
-            seasons.add(sData);
+        seasons = Integer.valueOf(qry.split(" ")[0]);
+        rating = Double.valueOf(qry.split(" ")[1]);
+
+        List<Serie> series = serieRepository.findByTotalSeasonsLessThanEqualAndRatingGreaterThanEqual(seasons, rating);
+
+        series.forEach(S ->
+                System.out.println("Titulo: " + S.getTitle() + " Rating: " + S.getRating() + " Temporadas: " + S.getTotalSeasons()));
+
+    }
+
+    private void searchSerieByGenre() {
+        String genre = showMenu("Escribe la categoria");
+        List<Serie> series = serieRepository.findByGenre(Category.fromString(genre));
+        series.forEach(System.out::println);
+    }
+
+    private void topFiveSeries() {
+        List<Serie> topFive = serieRepository.findTop5ByOrderByRatingDesc();
+        topFive.forEach(S -> System.out.println("Titulo: " + S.getTitle() + " Evaluacion: " + S.getRating()));
+    }
+
+    private void searchSerieByTitle() {
+        String tittle = showMenu("Dame el titulo de la serie");
+        Optional<Serie> found = serieRepository.findByTitleContainsIgnoreCase(tittle);
+
+        if(found.isPresent()) {
+            System.out.println("La serie buscada es");
+            System.out.println(found.get());
+        } else {
+            System.out.println("No se ha podido encontrar la serie2");
+        }
+    }
+
+    private void showSeries() {
+        series = serieRepository.findAll();
+
+        series.stream()
+                .sorted(Comparator.comparing(Serie::getTitle))
+                .forEach(System.out::println);
+    }
+
+    private void serie() {
+        String serieName = showMenu("Dame el nombre de la serie");
+        SerieData serieData = searchSerie(serieName);
+        Serie serie = new Serie(serieData);
+        serieRepository.save(serie);
+
+    }
+
+    private void episode() {
+        showSeries();
+        String serieName = showMenu("Dame el nombre de la serie");
+        Optional<Serie> serieOptional = series.stream()
+                .filter(N -> N.getTitle().toLowerCase().contains(serieName.toLowerCase()))
+                .findFirst();
+
+        if(serieOptional.isPresent()) {
+            Serie found = serieOptional.get();
+
+            List<SeasonData> seasons = new ArrayList<>();
+            for(int i = 1;i <= found.getTotalSeasons();i++) {
+                String json = apiUsage.getData("https://www.omdbapi.com/?apikey=" + Keys.ombdKey + "&t=" + serieName.replace(" ", "+") + "&season=" + i);
+                seasons.add(new JsonTransformer().fromJson(json, SeasonData.class));
+            }
+
+            List<Episode> episodes = seasons.stream()
+                    .flatMap(S -> S.episodes().stream()
+                            .map(E -> new Episode(S.season(),E)))
+                    .collect(Collectors.toList());
+
+            found.setEpisodes(episodes);
+            serieRepository.save(found);
         }
 
-        //mostrar solo el titulo de los episodios para las temporadas
-        //for(SeasonData seasonData : seasons) {
-        //    for(EpisodeData episodeData : seasonData.episodes()) {
-        //        System.out.println("Temporada: " + seasonData.season() + " Episodio: " + episodeData.title());
-        //    }
-        //}
 
-        List<EpisodeData> episodes = seasons.stream()
-                        .flatMap(E -> E.episodes().stream())
-                        .collect(Collectors.toList());
+    }
 
-        System.out.println("Los mejores 5 capitulos de todos los tiempos");
+    private SeasonData searchSeason(String name, String n) {
+        return searchSeason(name,String.valueOf(n));
+    }
 
-        episodes.stream()
-                .filter(E -> !E.rating().equalsIgnoreCase("N/A"))
-                .sorted(Comparator.comparing(EpisodeData::rating).reversed())
-                .map(E -> E.title().toUpperCase())
-                .limit(5)
-                .forEach(System.out::println);
+    private SeasonData searchSeason(String name, int n) {
+        String uri = "https://www.omdbapi.com/?apikey=" + Keys.ombdKey + "&t=" + name + "&season=" + n;
+        String json = apiUsage.getData(uri.replace(" ", "+"));
+        return new JsonTransformer().fromJson(json, SeasonData.class);
+    }
 
-
-        List<Episode> episodesClass = seasons.stream()
-                .flatMap(S -> S.episodes().stream()
-                        .map(E -> new Episode(S.season(),E)))
-                .collect(Collectors.toList());
-
-        //episodesClass.forEach(System.out::println);
-
-        //Busqueda de episodios a partir de X año
-        //Integer date = Integer.valueOf(showMenu("Indica el año apartir el cual deseas ver episodios"));
-
-        //LocalDate searchDate = LocalDate.of(date, 1, 1);
-
-        //DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yy");
-
-        //episodesClass.stream()
-                //.filter(E -> E.getRelease() != null && E.getRelease().isAfter(searchDate))
-                //.forEach(E -> {
-                    //System.out.println("Temporada: " + E.getSeason()
-                            //+ " Episodio " + E.getEpisode()
-                            //+ " Fecha Lanzamiento " + E.getRelease());
-                //});
-
-        //Buscar episodios por pedaso de titulo
-//        String search = showMenu("Dame el chacho o titulo completo para buscar");
-//
-//        Optional<Episode> episode = episodesClass.stream()
-//                .filter(E -> E.getTitle().toLowerCase().contains(search.toLowerCase()))
-//                .findFirst();
-//
-//        if(episode.isPresent()) {
-//            System.out.println(episode.get());
-//        } else {
-//            System.out.println("No se encontro un episodio");
-//        }
-
-        Map<Integer, Double> map = episodesClass.stream()
-                .filter(E -> E.getRating() > 0d)
-                .collect(Collectors.groupingBy(Episode::getSeason,
-                        Collectors.averagingDouble(Episode::getRating)));
-
-        System.out.println(map);
-
-        DoubleSummaryStatistics statistics = episodesClass.stream()
-                .filter(E -> E.getRating() > 0d)
-                .collect(Collectors.summarizingDouble(Episode::getRating));
-
-        System.out.println("La media de las evaluaciones es " + statistics.getAverage());
-        System.out.println("El episodio mejor evaluado tiene " + statistics.getMax());
+    private SerieData searchSerie(String name) {
+        String uri = "https://www.omdbapi.com/?apikey=" + Keys.ombdKey + "&t=" + name;
+        String json = apiUsage.getData(uri.replace(" ", "+"));
+        return new JsonTransformer().fromJson(json, SerieData.class);
     }
 
     public String showMenu(String s) {
