@@ -8,7 +8,9 @@ import com.remproyects.screenmatch.models.files.Episode;
 import com.remproyects.screenmatch.models.files.Serie;
 import com.remproyects.screenmatch.online.ApiUsage;
 import com.remproyects.screenmatch.online.util.Keys;
+import com.remproyects.screenmatch.repository.EpisodeRepository;
 import com.remproyects.screenmatch.repository.SerieRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -18,9 +20,11 @@ public class Main {
     private final Scanner scanner = new Scanner(System.in);
     private final ApiUsage apiUsage = new ApiUsage();
     private List<Serie> series;
+    private EpisodeRepository episodeRepository;
     private SerieRepository serieRepository;
 
-    public Main(SerieRepository serieRepository) {
+    public Main(SerieRepository serieRepository, EpisodeRepository episodeRepository) {
+        this.episodeRepository = episodeRepository;
         this.serieRepository = serieRepository;
         core();
     }
@@ -39,6 +43,8 @@ public class Main {
                     5. ¡Top 5 series!
                     6. Buscar por categoria
                     7. Buscar con maximo temporadas y minima evaluacion
+                    8. Buscar episodio por nombre
+                    9. Top 5 Episodios de una serie
                     
                     0. Salir
                     """).toLowerCase().charAt(0);
@@ -67,10 +73,32 @@ public class Main {
                 case '7':
                     searchBySeasonsAndRating();
                     break;
+                case '8':
+                    searchEpisodeByTitle();
+                    break;
+                case '9':
+                    topFiveEpisodes();
                 default:
                     System.out.println("Invalid option");
             }
         }
+    }
+
+    private void topFiveEpisodes() {
+        String serieName = showMenu("Dame el nombre de la serie");
+        Optional<Serie> serie = serieRepository.findByTitleContainsIgnoreCase(serieName);
+        if(serie.isPresent()) {
+            List<Episode> topEpisodes = episodeRepository.findTop5BySerieOrderByRatingDesc(serie.get());
+            topEpisodes.forEach(System.out::println);
+        } else {
+            System.out.println("Esa serie no existe");
+        }
+    }
+
+    private void searchEpisodeByTitle() {
+        String name = showMenu("Dame el nombre del capitulo");
+        List<Episode> episodes = episodeRepository.findByTitleContainingIgnoreCase(name);
+        episodes.forEach(System.out::println);
     }
 
     private void searchBySeasonsAndRating() {
