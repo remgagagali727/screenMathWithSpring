@@ -3,8 +3,10 @@ package com.remproyects.screenmatch.models.files;
 import com.remproyects.screenmatch.models.data_files.SerieData;
 import com.remproyects.screenmatch.models.defined.Category;
 import jakarta.persistence.*;
-import org.hibernate.annotations.Cascade;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 
 @Entity
@@ -67,6 +69,10 @@ public class Serie {
         return rating;
     }
 
+    public List<Episode> getEpisodes() {
+        return episodes;
+    }
+
     public void setEpisodes(List<Episode> episodes) {
         episodes.stream()
                 .forEach(E -> E.setSerie(this));
@@ -78,7 +84,7 @@ public class Serie {
     public Serie(SerieData serieData) {
         this.title = serieData.title();
         this.plot = serieData.plot();
-        this.poster = serieData.plot();
+        this.poster = serieData.poster();
         this.actors = serieData.actors();
         this.totalSeasons = serieData.totalSeasons();
         this.rating = serieData.rating();

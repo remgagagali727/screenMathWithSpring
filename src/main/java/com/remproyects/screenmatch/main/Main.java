@@ -6,11 +6,10 @@ import com.remproyects.screenmatch.models.data_files.SerieData;
 import com.remproyects.screenmatch.models.defined.Category;
 import com.remproyects.screenmatch.models.files.Episode;
 import com.remproyects.screenmatch.models.files.Serie;
-import com.remproyects.screenmatch.online.ApiUsage;
-import com.remproyects.screenmatch.online.util.Keys;
+import com.remproyects.screenmatch.service.ApiUsage;
+import com.remproyects.screenmatch.service.util.Keys;
 import com.remproyects.screenmatch.repository.EpisodeRepository;
 import com.remproyects.screenmatch.repository.SerieRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.*;
 import java.util.stream.Collectors;
